@@ -11,6 +11,7 @@ use std::{
 
 use mmap_rs::{MmapMut, MmapOptions};
 use thiserror::Error;
+use bytemuck::{Pod, bytes_of};
 
 pub trait VersionMarker {}
 #[derive(Debug)]
@@ -1099,6 +1100,11 @@ pub struct MmapMutWrapper<H: Hasher> {
 }
 
 impl<H: Hasher> MmapMutWrapper<H> {
+    // Make sure H::Hash is Pod
+    // This can be at the beginning of the module or wherever you define your structs/traits.
+    // This will ensure at compile time that H::Hash is indeed Pod.
+    static_assertions::assert_impl_all!(H::Hash: Pod);
+
     /// Creates a new memory map backed with file with provided size
     /// and fills the entire map with initial value
     ///
@@ -1122,15 +1128,16 @@ impl<H: Hasher> MmapMutWrapper<H> {
         let initial_vals: Vec<H::Hash> = vec![initial_value.clone(); storage_size];
 
         // cast Hash pointer to u8 pointer
-        let ptr = initial_vals.as_ptr().cast::<u8>();
+        // let ptr = initial_vals.as_ptr().cast::<u8>();
 
         let size_of_buffer: usize = storage_size * size_of_val;
 
-        let buf: &[u8] = unsafe {
+        // let buf: &[u8] = unsafe {
             // moving pointer by u8 for storage_size * size of hash would get us the full
             // buffer
-            std::slice::from_raw_parts(ptr, size_of_buffer)
-        };
+            // std::slice::from_raw_parts(ptr, size_of_buffer)
+        // };
+        let buf = bytes_of(&initial_vals);
 
         // assure that buffer is correct length
         assert_eq!(buf.len(), size_of_buffer);
